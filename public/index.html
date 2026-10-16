@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 本地应用：允许 blob worker（Mermaid 渲染需要）与 data/blob 资源 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: file:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file: https: http:; font-src 'self' data: file:; worker-src 'self' blob:; connect-src 'self' data: blob:;">
+<title>Typora 兼容编辑器</title>
+<link rel="stylesheet" href="/style/app.css">
+</head>
+<body data-theme="github">
+<!-- 一体化标题栏：左侧留出 macOS 红绿灯位置，中部显示文档标题，右侧为操作区 -->
+<header class="titlebar">
+  <div class="titlebar-traffic-spacer"></div>
+  <div class="titlebar-center">
+    <span id="doc-title" class="doc-title">未命名文档</span>
+    <span id="doc-state" class="doc-state"></span>
+  </div>
+  <div class="titlebar-actions">
+    <button id="btn-search" class="icon-button" type="button" title="查找（⌘F）" aria-label="查找">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12.8 12.8L17 17" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+    <button id="btn-source" class="icon-button" type="button" title="源码模式（⌘/）" aria-label="源码模式">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 5.5L3 10l4.5 4.5M12.5 5.5L17 10l-4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button id="btn-settings" class="icon-button" type="button" title="偏好设置" aria-label="偏好设置">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8.6 2.4h2.8l.35 1.9 1.2.5 1.6-1.1 2 2-1.1 1.6.5 1.2 1.9.35v2.8l-1.9.35-.5 1.2 1.1 1.6-2 2-1.6-1.1-1.2.5-.35 1.9H8.6l-.35-1.9-1.2-.5-1.6 1.1-2-2 1.1-1.6-.5-1.2-1.9-.35V8.6l1.9-.35.5-1.2-1.1-1.6 2-2 1.6 1.1 1.2-.5z" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linejoin="round"/><circle cx="10" cy="10" r="2.3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    </button>
+    <button id="btn-sidebar" class="icon-button" type="button" title="侧边栏" aria-label="侧边栏">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 3.5v13" stroke="currentColor" stroke-width="1.6"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="app-body">
+  <!-- 侧边栏：文件与大纲，默认收起，按需展开 -->
+  <aside id="sidebar" class="sidebar" aria-label="侧边栏">
+    <div class="sidebar-tabs" role="tablist">
+      <button class="sidebar-tab is-active" data-panel="outline" role="tab" type="button">大纲</button>
+      <button class="sidebar-tab" data-panel="files" role="tab" type="button">文件</button>
+    </div>
+    <div class="sidebar-panel is-active" data-panel="outline">
+      <div id="outline" class="outline"></div>
+    </div>
+    <div class="sidebar-panel" data-panel="files">
+      <div class="file-actions">
+        <button id="btn-open" class="text-button" type="button">打开文件</button>
+        <button id="btn-save-as" class="text-button" type="button">另存为</button>
+      </div>
+      <div id="recent" class="recent"></div>
+    </div>
+  </aside>
+
+  <main class="workspace">
+    <div class="scroll-host">
+      <div id="write" class="write">
+        <div id="document" class="document"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 底部状态栏：字数、主题、图床与导出入口 -->
+<footer class="statusbar">
+  <div class="status-left">
+    <span id="status" class="status-text" data-kind="info">正在初始化…</span>
+  </div>
+  <div class="status-right">
+    <span id="word-count" class="status-meta">0 字</span>
+    <button id="btn-theme" class="status-button" type="button" aria-haspopup="listbox">主题</button>
+    <button id="btn-export" class="status-button" type="button" aria-haspopup="menu">导出</button>
+    <button id="btn-image" class="status-button" type="button">插入图片</button>
+    <input id="upload-images" type="file" accept="image/*" multiple hidden>
+  </div>
+</footer>
+
+<!-- 浮动菜单：主题与导出，避免在顶栏堆积控件 -->
+<div id="theme-menu" class="popover" role="listbox" hidden></div>
+<div id="export-menu" class="popover" role="menu" hidden>
+  <button class="popover-item" data-format="pdf" role="menuitem" type="button">PDF 文档</button>
+  <button class="popover-item" data-format="html" role="menuitem" type="button">HTML 网页</button>
+  <div class="popover-separator"></div>
+  <button class="popover-item" data-format="docx" role="menuitem" type="button">Word 文档</button>
+  <button class="popover-item" data-format="odt" role="menuitem" type="button">OpenDocument</button>
+  <button class="popover-item" data-format="rtf" role="menuitem" type="button">RTF 文档</button>
+  <button class="popover-item" data-format="epub" role="menuitem" type="button">EPUB 电子书</button>
+  <button class="popover-item" data-format="latex" role="menuitem" type="button">LaTeX</button>
+  <button class="popover-item" data-format="mediawiki" role="menuitem" type="button">MediaWiki</button>
+</div>
+
+<!-- 查找栏 -->
+<div id="search-bar" class="search-bar" hidden>
+  <input id="search-input" type="search" placeholder="查找内容" aria-label="查找内容">
+  <span id="search-result" class="search-result"></span>
+  <button id="search-next" class="text-button" type="button">下一个</button>
+  <button id="search-close" class="text-button" type="button">关闭</button>
+</div>
+
+<script type="module" src="/dist/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: file:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file:; font-src 'self' data: file:; worker-src 'self' blob:; connect-src 'self' data: blob:;">
+<title>偏好设置</title>
+<link rel="stylesheet" href="/style/settings.css">
+</head>
+<body>
+<!-- 独立偏好设置窗口：左侧分类导航，右侧设置面板 -->
+<div class="settings-layout">
+  <nav class="settings-nav" aria-label="设置分类">
+    <div class="nav-title">偏好设置</div>
+    <button class="nav-item is-active" data-section="appearance" type="button">外观</button>
+    <button class="nav-item" data-section="editor" type="button">编辑器</button>
+    <button class="nav-item" data-section="markdown" type="button">Markdown</button>
+    <button class="nav-item" data-section="image" type="button">图像</button>
+    <button class="nav-item" data-section="export" type="button">导出</button>
+    <button class="nav-item" data-section="about" type="button">关于</button>
+  </nav>
+
+  <main class="settings-content">
+    <!-- 外观 -->
+    <section class="settings-section is-active" data-section="appearance">
+      <h1>外观</h1>
+      <div class="field">
+        <label for="set-theme">写作主题</label>
+        <select id="set-theme"></select>
+        <p class="hint">主题直接读取 Typora 主题目录中的 CSS 文件，新增主题后刷新列表即可使用。</p>
+      </div>
+      <div class="field">
+        <label for="set-dark-theme">暗色主题</label>
+        <select id="set-dark-theme"></select>
+        <p class="hint">跟随系统外观切换时使用的主题。</p>
+      </div>
+      <div class="field">
+        <label class="switch">
+          <input id="set-follow-system" type="checkbox">
+          <span>跟随系统外观</span>
+        </label>
+        <p class="hint">系统切换到暗色时自动使用暗色主题。</p>
+      </div>
+      <div class="field">
+        <label for="set-font-size">正文字号</label>
+        <div class="slider-row">
+          <input id="set-font-size" type="range" min="12" max="24" step="1" value="16">
+          <output id="set-font-size-value">16 px</output>
+        </div>
+        <p class="hint">仅影响编辑与预览的正文大小，主题自身的字号设置仍然生效。</p>
+      </div>
+    </section>
+
+    <!-- 编辑器 -->
+    <section class="settings-section" data-section="editor">
+      <h1>编辑器</h1>
+      <div class="field">
+        <label class="switch">
+          <input id="set-auto-save" type="checkbox">
+          <span>自动保存</span>
+        </label>
+        <p class="hint">编辑停止后自动写入当前文件。</p>
+      </div>
+      <div class="field">
+        <label for="set-auto-save-delay">自动保存延迟</label>
+        <div class="slider-row">
+          <input id="set-auto-save-delay" type="range" min="1" max="30" step="1" value="5">
+          <output id="set-auto-save-delay-value">5 秒</output>
+        </div>
+      </div>
+      <div class="field">
+        <label class="switch">
+          <input id="set-spellcheck" type="checkbox">
+          <span>拼写检查</span>
+        </label>
+      </div>
+      <div class="field">
+        <label class="switch">
+          <input id="set-strict-mode" type="checkbox">
+          <span>严格模式</span>
+        </label>
+        <p class="hint">启用后，Markdown 解析严格遵循 Typora 的语法规则。</p>
+      </div>
+    </section>
+
+    <!-- Markdown -->
+    <section class="settings-section" data-section="markdown">
+      <h1>Markdown</h1>
+      <div class="field">
+        <label class="switch">
+          <input id="set-inline-math" type="checkbox">
+          <span>行内公式</span>
+        </label>
+        <p class="hint">使用 <code>$...$</code> 渲染行内数学公式。</p>
+      </div>
+      <div class="field">
+        <label class="switch">
+          <input id="set-allow-physics" type="checkbox">
+          <span>允许 Physics 扩展</span>
+        </label>
+        <p class="hint">启用 MathJax 的 physics 扩展包，支持 <code>\pu{}</code> 等语法。</p>
+      </div>
+      <div class="field">
+        <label class="switch">
+          <input id="set-enable-diagrams" type="checkbox">
+          <span>图表</span>
+        </label>
+        <p class="hint">支持 mermaid、flow、sequence 三类图表围栏。</p>
+      </div>
+      <div class="field">
+        <label class="switch">
+          <input id="set-enable-toc" type="checkbox">
+          <span>目录</span>
+        </label>
+        <p class="hint">支持 <code>[TOC]</code> 自动生成目录。</p>
+      </div>
+    </section>
+
+    <!-- 图像 -->
+    <section class="settings-section" data-section="image">
+      <h1>图像</h1>
+      <div class="field">
+        <label for="set-uploader">图床服务</label>
+        <select id="set-uploader"></select>
+        <p class="hint">插入或拖入图片时使用的上传方式。</p>
+      </div>
+      <div class="field">
+        <label for="set-picgo-endpoint">PicGo 接口地址</label>
+        <input id="set-picgo-endpoint" type="text" placeholder="http://127.0.0.1:36677/upload" spellcheck="false">
+        <p class="hint">PicGo 与 PicList 桌面端的接口地址，默认端口 36677。</p>
+        <div class="inline-actions">
+          <button id="check-picgo" class="button" type="button">检测连通性</button>
+          <span id="picgo-status" class="status-note"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="set-target-dir">本地图床目录</label>
+        <input id="set-target-dir" type="text" placeholder="images" spellcheck="false">
+        <p class="hint">选择本地文件上传方式时，图片复制的目标目录，相对文档目录解析。</p>
+      </div>
+      <div class="field">
+        <label for="set-custom-url">自定义上传接口</label>
+        <input id="set-custom-url" type="text" placeholder="https://example.com/upload" spellcheck="false">
+        <p class="hint">请求体支持 ${filepath} 与 ${filename} 占位符。</p>
+      </div>
+    </section>
+
+    <!-- 导出 -->
+    <section class="settings-section" data-section="export">
+      <h1>导出</h1>
+      <div class="field">
+        <label for="set-page-size">PDF 页面尺寸</label>
+        <select id="set-page-size">
+          <option value="A4">A4</option>
+          <option value="Letter">Letter</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="set-margin">页边距</label>
+        <div class="slider-row">
+          <input id="set-margin" type="range" min="0" max="40" step="1" value="16">
+          <output id="set-margin-value">16 毫米</output>
+        </div>
+      </div>
+      <div class="field">
+        <div class="env-list">
+          <div class="env-row">
+            <span class="env-label">Chrome</span>
+            <span id="env-chrome" class="env-value">检测中…</span>
+          </div>
+          <div class="env-row">
+            <span class="env-label">pandoc</span>
+            <span id="env-pandoc" class="env-value">检测中…</span>
+          </div>
+          <div class="env-row">
+            <span class="env-label">可用主题</span>
+            <span id="env-themes" class="env-value">检测中…</span>
+          </div>
+        </div>
+        <p class="hint">PDF 由 Chrome 无头模式生成，docx、odt、rtf、epub、LaTeX 等格式由 pandoc 转换。</p>
+      </div>
+    </section>
+
+    <!-- 关于 -->
+    <section class="settings-section" data-section="about">
+      <h1>关于</h1>
+      <div class="about-block">
+        <div class="about-logo">Ty</div>
+        <div class="about-text">
+          <div class="about-name">Typora 兼容编辑器</div>
+          <div id="about-version" class="about-version">版本读取中…</div>
+          <p class="hint">
+            基于 REA 对 Typora 应用包的逆向契约实现，主题文件可原地迁移使用。
+            渲染管线遵循 Typora 的 DOM 结构，公式使用 MathJax，图表使用 Mermaid、flowchart.js 与 js-sequence-diagrams。
+          </p>
+        </div>
+      </div>
+      <div class="env-list">
+        <div class="env-row">
+          <span class="env-label">Electron</span>
+          <span id="env-electron" class="env-value">—</span>
+        </div>
+        <div class="env-row">
+          <span class="env-label">Chromium</span>
+          <span id="env-chromium" class="env-value">—</span>
+        </div>
+        <div class="env-row">
+          <span class="env-label">Node.js</span>
+          <span id="env-node" class="env-value">—</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 底部操作栏：取消与保存 -->
+<footer class="settings-footer">
+  <span id="settings-status" class="settings-status"></span>
+  <div class="footer-actions">
+    <button id="settings-reset" class="button" type="button">恢复默认</button>
+    <button id="settings-save" class="button button-primary" type="button">保存</button>
+  </div>
+</footer>
+
+<script type="module" src="/dist/settings.js"></script>
+</body>
+</html>
