@@ -2,6 +2,13 @@
 
 基于 REA 对 Typora 1.14.10 应用包的逆向契约实现的 macOS 桌面应用，采用 Electron 架构，与 Typora 同源。Typora 主题文件可原地迁移使用，无需改写 CSS。
 
+- **GitHub 仓库**: [https://github.com/Jiao77/typora-compatible-editor](https://github.com/Jiao77/typora-compatible-editor)
+- **Gitea 仓库**: [https://gitea.jiao77.com/Jiao77/typora-compatible-editor](https://gitea.jiao77.com/Jiao77/typora-compatible-editor)
+- **v1.0.0 发布版下载**:
+  - [GitHub Releases 资产下载 (arm64.zip)](https://github.com/Jiao77/typora-compatible-editor/releases/download/v1.0.0/Typora-Compatible-Editor-1.0.0-mac-arm64.zip)
+  - [Gitea Releases 页面](https://gitea.jiao77.com/Jiao77/typora-compatible-editor/releases/tag/v1.0.0)
+
+
 ## 功能范围
 
 | 类别 | 能力 |
