@@ -1,10 +1,14 @@
 import { constants as fsConstants } from 'node:fs'
 import { access, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
+
+import { getRuntimeDataDir } from './runtime-data.js'
 
 import { runProcess } from './run-process.js'
+
+const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 export const CHROME_PATH = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 
@@ -104,7 +108,9 @@ export async function exportPdf({ bodyHtml, title, css, outPath, options } = {})
   })
   const html = rendered.html
 
-  const temporaryDirectory = await mkdtemp(path.join(tmpdir(), 'typora-export-pdf-'))
+  const runtimeTmpDir = path.join(getRuntimeDataDir(ROOT_DIR), 'tmp')
+  await mkdir(runtimeTmpDir, { recursive: true })
+  const temporaryDirectory = await mkdtemp(path.join(runtimeTmpDir, 'typora-export-pdf-'))
   const htmlPath = path.join(temporaryDirectory, 'document.html')
   const chromeProfileDirectory = path.join(temporaryDirectory, 'chrome-profile')
   try {

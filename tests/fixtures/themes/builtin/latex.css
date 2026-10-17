@@ -1,0 +1,23 @@
+:root {
+  --base-font: "Times New Roman", Times, "Songti SC", Georgia, serif;
+  --text-color: #111111;
+  --bg-color: #fafafa;
+}
+
+body {
+  font-family: var(--base-font);
+  color: var(--text-color);
+  background-color: var(--bg-color);
+  line-height: 1.8;
+}
+
+#write {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 40px;
+}
+
+#write h1 { text-align: center; font-size: 1.8em; margin-bottom: 1.2em; }
+#write h2 { font-size: 1.4em; margin-top: 1.4em; }
+#write h3 { font-size: 1.2em; }
+#write p { text-indent: 2em; margin: 0.6em 0; text-align: justify; }

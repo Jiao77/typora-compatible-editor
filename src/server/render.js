@@ -119,11 +119,12 @@ function renderHardbreak() {
 // 图片：Typora 输出 span.md-image 包裹 img，主题选择器依赖该结构
 function renderImage(tokens, idx, options, env, self) {
   const token = tokens[idx];
-  const src = token.attrGet('src') || '';
-  const title = token.attrGet('title');
-  const alt = self.renderInlineAsText(token.children || [], options, env);
-  const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
-  return `<span class="md-image md-img-loaded"><img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttr}></span>`;
+  const altText = self.renderInlineAsText(token.children || [], options, env);
+  token.attrSet('alt', altText);
+  if (token.attrs) {
+    token.attrs = token.attrs.filter(([name]) => !/^on/i.test(name));
+  }
+  return `<span class="md-image md-img-loaded"><img${self.renderAttrs(token)}></span>`;
 }
 
 // Emoji token 的内容位于 markup 字段之外，直接取 content
@@ -201,6 +202,15 @@ installAlerts(md);
 installToc(md);
 renderTaskListFix(md);
 applyTyporaDom(md);
+
+// 允许 file 协议图片在整篇文档与块级解析中作为合法图片节点输出
+const originalValidateLink = md.validateLink;
+md.validateLink = function (url) {
+  if (typeof url === "string" && url.startsWith("file://")) {
+    return true;
+  }
+  return originalValidateLink.call(this, url);
+};
 
 export function renderMarkdown(source) {
   const tokens = md.parse(source, {});

@@ -1,7 +1,8 @@
 node_modules/
 dist/*.map
-work/exports/
-work/uploads/
-work/settings.json
+work/
 tests/.tmp/
 dist-package/
+*.dmg
+*.zip
+.DS_Store
