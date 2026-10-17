@@ -1,13 +1,13 @@
 # TYPOAR
 
-基于对 Typora 1.14.10 应用包逆向契约实现的 macOS 桌面应用。应用采用 Electron 框架，实现 Typora DOM 容器契约与基础样式兼容。支持导入外部 Typora 主题文件直接使用。
+TYPOAR 是一款 macOS Markdown 编辑器，支持就地编辑、数学公式、图表、多格式导出和图床上传，也支持导入 Typora 主题。
 
-- **GitHub 仓库**：[https://github.com/Jiao77/typora-compatible-editor](https://github.com/Jiao77/typora-compatible-editor)
-- **Gitea 仓库**：[https://gitea.jiao77.com/Jiao77/typora-compatible-editor](https://gitea.jiao77.com/Jiao77/typora-compatible-editor)
+- **GitHub 仓库**：[https://github.com/Jiao77/TYPOAR](https://github.com/Jiao77/TYPOAR)
+- **Gitea 仓库**：[https://gitea.jiao77.com/Jiao77/TYPOAR](https://gitea.jiao77.com/Jiao77/TYPOAR)
 - **历史发布版本**：
-  - [GitHub Releases 资产下载 (v1.0.0 arm64.zip)](https://github.com/Jiao77/typora-compatible-editor/releases/download/v1.0.0/Typora-Compatible-Editor-1.0.0-mac-arm64.zip)
-  - [Gitea Releases 页面](https://gitea.jiao77.com/Jiao77/typora-compatible-editor/releases/tag/v1.0.0)
-- **当前开发状态**：当前开发分支为 `codex/local-takeover`，基于已发布的 `main` 分支代码接管。本地支持直接构建、运行、测试与打包。
+  - [GitHub Releases 资产下载 (v1.0.0 arm64.zip)](https://github.com/Jiao77/TYPOAR/releases/download/v1.0.0/Typora-Compatible-Editor-1.0.0-mac-arm64.zip)
+  - [Gitea Releases 页面](https://gitea.jiao77.com/Jiao77/TYPOAR/releases/tag/v1.0.0)
+- **当前开发状态**：主分支为 `main`，支持源码运行、测试与 macOS 应用打包。
 
 ## 功能范围
 
