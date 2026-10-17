@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: file:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file:; font-src 'self' data: file:; worker-src 'self' blob:; connect-src 'self' data: blob:;">
-<title>偏好设置</title>
+<title>偏好设置 - TYPOAR</title>
+<link rel="icon" type="image/png" href="/branding/typo-ar.png">
 <link rel="stylesheet" href="/style/settings.css">
 </head>
 <body>
@@ -140,8 +141,25 @@
       </div>
       <div class="field">
         <label for="set-custom-url">自定义上传接口</label>
-        <input id="set-custom-url" type="text" placeholder="https://example.com/upload" spellcheck="false">
-        <p class="hint">请求体支持 ${filepath} 与 ${filename} 占位符。</p>
+        <input id="set-custom-url" type="text" placeholder="https://img.jiao77.com/upload" spellcheck="false">
+        <p class="hint">自定义服务端点，支持 Cloudflare Worker 或标准上传接口。</p>
+      </div>
+      <div class="field">
+        <label for="set-custom-token">认证令牌 (Bearer Token)</label>
+        <input id="set-custom-token" type="password" placeholder="未配置或留空保持不变" autocomplete="off" spellcheck="false">
+        <p class="hint">请求时通过 Authorization: Bearer 携带。留空保存时将保留现有令牌配置。</p>
+      </div>
+      <div class="field">
+        <label for="set-custom-body-type">请求格式与字段</label>
+        <div class="slider-row">
+          <select id="set-custom-body-type">
+            <option value="multipart">Multipart 表单上传 (推荐)</option>
+            <option value="json">JSON 请求体</option>
+          </select>
+          <input id="set-custom-file-field" type="text" placeholder="文件字段名 (默认 file)" spellcheck="false">
+          <input id="set-custom-url-path" type="text" placeholder="响应 URL 路径 (默认 url)" spellcheck="false">
+        </div>
+        <p class="hint">支持配置表单字段名（如 file）及响应 JSON 中提取图片链接的属性路径（如 url 或 data.url）。</p>
       </div>
     </section>
 
@@ -185,9 +203,9 @@
     <section class="settings-section" data-section="about">
       <h1>关于</h1>
       <div class="about-block">
-        <div class="about-logo">Ty</div>
+        <div class="about-logo"><img src="/branding/typo-ar.png" alt="TYPOAR" width="56" height="56" style="width:100%;height:100%;border-radius:14px;object-fit:cover;display:block;"></div>
         <div class="about-text">
-          <div class="about-name">Typora 兼容编辑器</div>
+          <div class="about-name">TYPOAR</div>
           <div id="about-version" class="about-version">版本读取中…</div>
           <p class="hint">
             基于 REA 对 Typora 应用包的逆向契约实现，主题文件可原地迁移使用。

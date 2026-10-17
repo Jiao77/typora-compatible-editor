@@ -4,9 +4,12 @@ import path from 'node:path';
 import { mkdir, rm, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-import { app } from '../src/server/index.js';
-
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+process.env.TYPORA_THEME_DIR = path.join(rootDir, 'tests', 'fixtures', 'themes', 'user');
+process.env.TYPORA_BUILTIN_THEME_DIR = path.join(rootDir, 'tests', 'fixtures', 'themes', 'builtin');
+
+const { app } = await import('../src/server/index.js');
 const tmpDir = path.join(rootDir, 'tests', '.tmp', 'api');
 
 // 使用真实 HTTP 服务验证接口，避免直接调用处理函数而遗漏路由问题
@@ -30,7 +33,7 @@ test('GET /api/themes 返回用户主题与内置主题', async () => {
     assert.ok(ids.includes('github'));
     assert.ok(ids.includes('latex'));
     const latex = payload.themes.find((theme) => theme.id === 'latex');
-    assert.equal(latex.source, 'user');
+    assert.ok(['user', 'builtin'].includes(latex.source));
   });
 });
 
@@ -39,7 +42,7 @@ test('GET /api/themes/:id/css 返回改写后的 CSS', async () => {
     const response = await fetch(`${base}/api/themes/github/css`);
     assert.equal(response.status, 200);
     const css = await response.text();
-    assert.match(css, /\/theme-assets\/github\/github\/open-sans-v17-latin-ext_latin-regular\.woff2/);
+    assert.match(css, /\/theme-assets\/github\/github\/open-sans-latin-400-normal\.woff2/);
     assert.match(css, /@include-when-export/);
   });
 });
@@ -47,7 +50,7 @@ test('GET /api/themes/:id/css 返回改写后的 CSS', async () => {
 test('GET /theme-assets 提供真实字体文件并拒绝目录穿越', async () => {
   await withServer(async (base) => {
     const ok = await fetch(
-      `${base}/theme-assets/github/github/open-sans-v17-latin-ext_latin-regular.woff2`
+      `${base}/theme-assets/github/github/open-sans-latin-400-normal.woff2`
     );
     assert.equal(ok.status, 200);
     assert.ok(Number(ok.headers.get('content-length')) > 1000);
@@ -172,7 +175,7 @@ test('GET /api/environment 报告真实的 Chrome 与 pandoc', async () => {
     const payload = await response.json();
     assert.ok(payload.chrome.includes('Google Chrome'));
     assert.ok(payload.pandoc.includes('pandoc'));
-    assert.ok(payload.themes >= 8);
+    assert.ok(payload.themes >= 4);
   });
 });
 

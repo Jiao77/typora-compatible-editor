@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "typoar-imagehost",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-16",
+  "account_id": "e15816b6cddea868828d3ab5423a6f13",
+  "r2_buckets": [
+    {
+      "binding": "IMAGES",
+      "bucket_name": "jiao77-files"
+    }
+  ],
+  "vars": {
+    "PUBLIC_BASE_URL": "https://file.jiao77.com"
+  }
+}

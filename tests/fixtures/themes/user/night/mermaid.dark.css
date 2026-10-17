@@ -1,0 +1,8 @@
+:root {
+  --mermaid-theme: night;
+  --mermaid-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+.md-diagram {
+  background-color: #282c34;
+  color: #abb2bf;
+}

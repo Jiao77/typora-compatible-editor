@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { constants } from 'node:fs';
-import { copyFile, mkdir } from 'node:fs/promises';
+import { copyFile, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
@@ -49,6 +49,11 @@ export const UPLOADERS = Object.freeze([
     transport: 'command',
     command: 'picgo',
     args: ['u'],
+  }),
+  Object.freeze({
+    id: 'custom',
+    name: 'Custom (自定义/Cloudflare R2)',
+    transport: 'custom',
   }),
 ]);
 
@@ -119,8 +124,16 @@ function parseJson(text) {
   }
 }
 
-function resolveHeaders(configuredHeaders, body) {
+function resolveHeaders(configuredHeaders, body, isMultipart = false) {
   const headers = { ...(configuredHeaders || {}) };
+  if (isMultipart) {
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase() === 'content-type') {
+        delete headers[key];
+      }
+    }
+    return headers;
+  }
   if (body !== undefined) {
     const hasContentType = Object.keys(headers).some(
       (key) => key.toLowerCase() === 'content-type',
@@ -343,17 +356,51 @@ export class ImageHost {
     const filepath = resolveFilePath(file, this.documentDir);
     const filename = resolveFilename(file, filepath);
     const variables = { filepath, filename };
-    const configuredBody = settings.body === undefined
-      ? { filepath: '${filepath}', filename: '${filename}' }
-      : settings.body;
-    const renderedBody = renderTemplateValue(configuredBody, variables);
     const method = String(settings.method || 'POST').toUpperCase();
-    const body = method === 'GET' || method === 'HEAD'
-      ? undefined
-      : typeof renderedBody === 'string'
-        ? renderedBody
-        : JSON.stringify(renderedBody);
-    const headers = resolveHeaders(settings.headers, body);
+
+    const rawHeaders = { ...(settings.headers || {}) };
+    const token = typeof settings.token === 'string' && settings.token.trim() !== ''
+      ? settings.token.trim()
+      : (typeof settings.custom_token === 'string' && settings.custom_token.trim() !== '' ? settings.custom_token.trim() : '');
+    if (token && !Object.keys(rawHeaders).some((key) => key.toLowerCase() === 'authorization')) {
+      rawHeaders.Authorization = `Bearer ${token}`;
+    }
+
+    const isExplicitJson = settings.bodyType !== 'multipart';
+    let body;
+    let headers;
+
+    if (!isExplicitJson && method !== 'GET' && method !== 'HEAD') {
+      const fileBuffer = await readFile(filepath);
+      const mimeType = file.mime || 'application/octet-stream';
+      const fileBlob = new Blob([fileBuffer], { type: mimeType });
+      const formData = new FormData();
+      const fileFieldName = (typeof settings.fileField === 'string' && settings.fileField.trim() !== '')
+        ? settings.fileField.trim()
+        : 'file';
+      formData.append(fileFieldName, fileBlob, filename);
+
+      if (settings.body && typeof settings.body === 'object' && !Array.isArray(settings.body)) {
+        for (const [key, val] of Object.entries(settings.body)) {
+          const renderedVal = renderTemplateValue(val, variables);
+          formData.append(key, typeof renderedVal === 'string' ? renderedVal : JSON.stringify(renderedVal));
+        }
+      }
+
+      body = formData;
+      headers = resolveHeaders(rawHeaders, body, true);
+    } else {
+      const configuredBody = settings.body === undefined
+        ? { filepath: '${filepath}', filename: '${filename}' }
+        : settings.body;
+      const renderedBody = renderTemplateValue(configuredBody, variables);
+      body = method === 'GET' || method === 'HEAD'
+        ? undefined
+        : typeof renderedBody === 'string'
+          ? renderedBody
+          : JSON.stringify(renderedBody);
+      headers = resolveHeaders(rawHeaders, body, false);
+    }
 
     const response = await fetch(endpoint, {
       method,
@@ -394,10 +441,9 @@ export class ImageHost {
 
   async uploadLocal(file) {
     const settings = this.getSettings('local');
-    const targetSetting = settings.targetDir;
-    if (typeof targetSetting !== 'string' || targetSetting.trim() === '') {
-      throw new Error('local 上传器缺少 settings.targetDir');
-    }
+    const targetSetting = (typeof settings.targetDir === 'string' && settings.targetDir.trim() !== '')
+      ? settings.targetDir.trim()
+      : 'uploads';
 
     const filepath = resolveFilePath(file, this.documentDir);
     const filename = resolveFilename(file, filepath);
@@ -407,12 +453,8 @@ export class ImageHost {
     await mkdir(targetDir, { recursive: true });
 
     const copied = await this.copyWithUniqueName(filepath, targetDir, filename);
-    const relativePath = path
-      .relative(targetDir, copied.absolutePath)
-      .split(path.sep)
-      .join('/');
     return {
-      url: `/local-images/${relativePath}`,
+      url: `/api/document-image?path=${encodeURIComponent(copied.absolutePath)}`,
       filename: copied.filename,
       uploader: 'local',
       absolutePath: copied.absolutePath,

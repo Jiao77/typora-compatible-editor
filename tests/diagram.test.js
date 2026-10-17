@@ -4,10 +4,13 @@ import path from 'node:path';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-import { app } from '../src/server/index.js';
-import { DIAGRAM_LANGS, MERMAID_LANGS, FLOW_LANGS, SEQUENCE_LANGS } from '../src/web/mermaid.js';
-
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+process.env.TYPORA_THEME_DIR = path.join(rootDir, 'tests', 'fixtures', 'themes', 'user');
+process.env.TYPORA_BUILTIN_THEME_DIR = path.join(rootDir, 'tests', 'fixtures', 'themes', 'builtin');
+
+const { app } = await import('../src/server/index.js');
+import { DIAGRAM_LANGS, MERMAID_LANGS, FLOW_LANGS, SEQUENCE_LANGS } from '../src/web/mermaid.js';
 const tmpDir = path.join(rootDir, 'tests', '.tmp', 'diagram');
 
 async function withServer(run) {

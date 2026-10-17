@@ -1,9 +1,35 @@
-import { app, BrowserWindow, Menu, dialog, shell, ipcMain, nativeTheme } from 'electron';
+import { app, BrowserWindow, Menu, dialog, shell, ipcMain, nativeTheme, nativeImage } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'node:http';
+import { mkdirSync } from 'node:fs';
 
-import { startServer } from '../server/index.js';
+import {
+  PRODUCT_NAME,
+  LEGACY_DATA_DIR_NAME,
+  ICON_PNG_PATH,
+  assertBrandAssetsExist
+} from '../branding.js';
+
+// 严格核验品牌图标资源文件，缺失立即终止
+assertBrandAssetsExist();
+
+// 载入品牌图标，若 nativeImage 为空则立即抛出错误
+const brandIcon = nativeImage.createFromPath(ICON_PNG_PATH);
+if (brandIcon.isEmpty()) {
+  throw new Error(`加载品牌图标失败，nativeImage 为空：${ICON_PNG_PATH}`);
+}
+
+// 在 app.whenReady 之前固定既有 userData 路径并设置应用名称，
+// 确保不会因为应用名称变更导致数据目录偏移至新名称目录而丢失既有用户设置。
+// setPath 指向目录需先创建，继续尊重预先设置的 TYPORA_DATA_DIR 环境变量。
+const appDataDir = app.getPath('appData');
+const legacyUserDataDir = process.env.TYPORA_DATA_DIR
+  ? path.resolve(process.env.TYPORA_DATA_DIR)
+  : path.join(appDataDir, LEGACY_DATA_DIR_NAME);
+mkdirSync(legacyUserDataDir, { recursive: true });
+app.setPath('userData', legacyUserDataDir);
+app.setName(PRODUCT_NAME);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '../..');
@@ -21,6 +47,14 @@ let isQuitting = false;
 // 启动内置 Express 服务，渲染进程与导出功能共用同一套接口
 async function ensureServer() {
   if (serverInfo) return serverInfo;
+
+  // 若未显式配置数据目录，桌面端默认使用当前用户的应用数据目录
+  if (process.env.TYPORA_DATA_DIR === undefined) {
+    process.env.TYPORA_DATA_DIR = app.getPath('userData');
+  }
+
+  // 动态导入服务端入口，确保服务模块初始化时已读取到正确的环境变量
+  const { startServer } = await import('../server/index.js');
   serverInfo = await startServer({ port: 0 });
   return serverInfo;
 }
@@ -32,7 +66,8 @@ function createMainWindow(url) {
     height: 860,
     minWidth: 900,
     minHeight: 620,
-    title: 'Typora 兼容编辑器',
+    title: PRODUCT_NAME,
+    icon: brandIcon,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 18 },
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#ffffff',
@@ -117,6 +152,7 @@ function openSettingsWindow() {
     parent: mainWindow,
     modal: false,
     title: '偏好设置',
+    icon: brandIcon,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 14, y: 16 },
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1e1e1e' : '#f5f5f7',
@@ -140,6 +176,14 @@ function openSettingsWindow() {
 
 // 构建原生菜单，快捷键与 Typora 保持一致
 function buildMenu() {
+  if (app.setAboutPanelOptions) {
+    app.setAboutPanelOptions({
+      applicationName: PRODUCT_NAME,
+      applicationVersion: app.getVersion(),
+      iconPath: ICON_PNG_PATH
+    });
+  }
+
   const template = [
     {
       label: app.name,
@@ -337,6 +381,8 @@ function registerIpc() {
   });
 
   ipcMain.handle('app:info', () => ({
+    name: app.getName(),
+    userDataPath: app.getPath('userData'),
     version: app.getVersion(),
     electron: process.versions.electron,
     chrome: process.versions.chrome,
@@ -350,6 +396,9 @@ function registerIpc() {
 }
 
 app.whenReady().then(async () => {
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(brandIcon);
+  }
   const info = await ensureServer();
   registerIpc();
   buildMenu();

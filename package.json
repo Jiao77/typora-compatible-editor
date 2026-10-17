@@ -1,16 +1,20 @@
 {
   "name": "typora-compatible-editor",
+  "productName": "TYPOAR",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Typora 兼容的 Markdown 编辑器：主题直接迁移、扩展语法、MathJax、Mermaid、多格式导出、图床上传",
+  "description": "TYPOAR：Typora 兼容的 Markdown 编辑器，支持主题直接迁移、扩展语法、MathJax、Mermaid、多格式导出与图床上传",
   "main": "src/electron/main.js",
   "scripts": {
     "start": "node src/server/index.js",
     "build": "node scripts/build-vendor.js && node scripts/build-renderer.js",
     "test": "node --test --test-concurrency=1 tests/",
     "desktop": "electron .",
-    "desktop:dev": "TYPORA_DEV=1 electron ."
+    "desktop:dev": "TYPORA_DEV=1 electron .",
+    "package:mac": "npm run build && node scripts/package-mac.js",
+    "package:dmg": "npm run package:mac && node scripts/make-dmg.js",
+    "package": "npm run package:dmg"
   },
   "engines": {
     "node": ">=20"

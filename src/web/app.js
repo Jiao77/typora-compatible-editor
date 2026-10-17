@@ -1,4 +1,7 @@
 import { InPlaceEditor } from './inplace.js';
+import { resolveDocumentImages, formatMarkdownImage, encodeMarkdownPath } from './document-images.js';
+import { SearchCursor } from '@codemirror/search';
+import { bindImageContextMenu } from './image-actions.js';
 
 // Typora 式单栏编辑器：整篇文档就地渲染，光标所在块显示 Markdown 源码
 
@@ -46,9 +49,25 @@ const elements = {
 
 let editor = null;
 
+let statusTimer = null;
 function setStatus(message, kind = 'info') {
-  elements.status.textContent = message;
+  if (statusTimer) {
+    clearTimeout(statusTimer);
+    statusTimer = null;
+  }
+  elements.status.textContent = message || '';
+  if (!message) {
+    delete elements.status.dataset.kind;
+    return;
+  }
   elements.status.dataset.kind = kind;
+  if (kind === 'ok') {
+    statusTimer = setTimeout(() => {
+      elements.status.textContent = '';
+      delete elements.status.dataset.kind;
+      statusTimer = null;
+    }, 2600);
+  }
 }
 
 async function requestJson(url, options) {
@@ -69,6 +88,10 @@ async function requestJson(url, options) {
 }
 
 function getSource() {
+  if (state.sourceMode) {
+    const textarea = elements.docRoot.querySelector('#source-editor');
+    return textarea ? textarea.value : '';
+  }
   return editor ? editor.getSource() : '';
 }
 
@@ -185,9 +208,9 @@ function normalizeThemeName(value) {
     .replace(/\.css$/, '');
 }
 
-const WELCOME_DOC = `# 欢迎使用 Typora 兼容编辑器
+const WELCOME_DOC = `# 欢迎使用 TYPOAR
 
-本编辑器采用 Typora 式就地渲染：点击任意段落即可直接编辑该段落，其余内容保持最终排版。
+本编辑器采用 Typora 式就地渲染：点击或移动光标至目标行即可编辑，其余内容保持最终排版。
 
 ## 数学公式
 
@@ -232,6 +255,7 @@ function createInPlaceEditor() {
   return new InPlaceEditor({
     root: elements.docRoot,
     theme: state.currentTheme,
+    documentPath: state.currentPath,
     onChange: () => {
       state.dirty = true;
       if (window.desktop && window.desktop.reportDirtyState) {
@@ -290,18 +314,20 @@ async function openFile(target) {
     body: JSON.stringify({ path: target })
   });
   state.sourceMode = false;
+  state.currentPath = payload.path;
   if (editor) editor.dispose();
   editor = createInPlaceEditor();
   editor.setTheme(state.currentTheme);
+  if (typeof editor.setDocumentPath === 'function') {
+    editor.setDocumentPath(payload.path);
+  }
   await editor.load(payload.content);
-  state.currentPath = payload.path;
   state.dirty = false;
   if (window.desktop && window.desktop.reportDirtyState) {
     window.desktop.reportDirtyState(false);
   }
   pushRecent(payload.path);
   updateDocumentMeta();
-  setStatus(`已打开 ${payload.name}`, 'ok');
 }
 
 async function saveToPath(target, { silent = false } = {}) {
@@ -312,6 +338,9 @@ async function saveToPath(target, { silent = false } = {}) {
     body: JSON.stringify({ path: target, content: getSource() })
   });
   state.currentPath = payload.path;
+  if (editor && typeof editor.setDocumentPath === 'function') {
+    editor.setDocumentPath(payload.path);
+  }
   state.dirty = false;
   if (window.desktop && window.desktop.reportDirtyState) {
     window.desktop.reportDirtyState(false);
@@ -421,6 +450,8 @@ async function handleExport(format) {
   }
 }
 
+// formatMarkdownImage 与 encodeMarkdownPath 统一由 document-images.js 导出
+
 async function handleUpload(files) {
   if (!files || files.length === 0) return;
   const form = new FormData();
@@ -433,16 +464,8 @@ async function handleUpload(files) {
     const response = await fetch('/api/images/upload', { method: 'POST', body: form });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || '上传失败');
-    const markdown = payload.results.map((item) => `![${item.filename}](${item.url})`).join('\n\n');
-    const source = `${getSource()}\n\n${markdown}\n`;
-    if (editor) {
-      editor.dispose();
-      editor = createInPlaceEditor();
-      editor.setTheme(state.currentTheme);
-      await editor.load(source);
-    }
-    state.dirty = true;
-    updateDocumentMeta();
+    const markdown = payload.results.map((item) => formatMarkdownImage(item.filename, item.url)).join('\n\n');
+    await insertText(`\n${markdown}\n`);
     setStatus(`上传完成，插入 ${payload.results.length} 个图片引用`, 'ok');
   } catch (error) {
     setStatus(`上传失败：${error.message}`, 'error');
@@ -455,17 +478,9 @@ async function handleInsertImage() {
     try {
       const paths = await window.desktop.chooseImages();
       if (!paths || paths.length === 0) return;
-      // 原生对话框返回的是绝对路径，直接插入引用还是上传由用户偏好决定
-      const markdown = paths.map((target) => `![${target.split('/').pop()}](${target})`).join('\n\n');
-      const source = `${getSource()}\n\n${markdown}\n`;
-      if (editor) {
-        editor.dispose();
-        editor = createInPlaceEditor();
-        editor.setTheme(state.currentTheme);
-        await editor.load(source);
-      }
-      state.dirty = true;
-      updateDocumentMeta();
+      // 原生对话框返回的是绝对路径，使用 formatMarkdownImage 支持中文与特殊路径
+      const markdown = paths.map((target) => formatMarkdownImage(target.split('/').pop(), target)).join('\n\n');
+      await insertText(`\n${markdown}\n`);
       setStatus(`已插入 ${paths.length} 个图片引用`, 'ok');
       return;
     } catch (error) {
@@ -488,6 +503,14 @@ async function toggleSourceMode() {
     textarea.id = 'source-editor';
     textarea.spellcheck = false;
     textarea.value = source;
+    textarea.addEventListener('input', () => {
+      state.dirty = true;
+      if (window.desktop && window.desktop.reportDirtyState) {
+        window.desktop.reportDirtyState(true);
+      }
+      updateDocumentMeta();
+      if (state.settings.autoSave && state.currentPath) scheduleAutoSave();
+    });
     elements.docRoot.replaceChildren(textarea);
     textarea.focus();
     elements.buttons.source.classList.add('is-active');
@@ -500,6 +523,9 @@ async function toggleSourceMode() {
   state.sourceMode = false;
   editor = createInPlaceEditor();
   editor.setTheme(state.currentTheme);
+  if (typeof editor.setDocumentPath === 'function') {
+    editor.setDocumentPath(state.currentPath);
+  }
   await editor.load(source);
   elements.buttons.source.classList.remove('is-active');
   state.dirty = true;
@@ -518,33 +544,40 @@ async function insertText(text, { wrap } = {}) {
       const insertion = wrap ? `${wrap[0]}${selected}${wrap[1]}` : text;
       textarea.value = textarea.value.slice(0, start) + insertion + textarea.value.slice(end);
       textarea.selectionStart = textarea.selectionEnd = start + insertion.length;
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
     }
     return;
   }
-  if (editor && editor.activeIndex !== null && editor.blockEditor) {
+  if (editor && editor.blockEditor) {
     const view = editor.blockEditor;
     const { from, to } = view.state.selection.main;
     const selected = view.state.doc.sliceString(from, to);
     const insertion = wrap ? `${wrap[0]}${selected}${wrap[1]}` : text;
     view.dispatch({ changes: { from, to, insert: insertion }, selection: { anchor: from + insertion.length } });
     view.focus();
+    state.dirty = true;
+    if (window.desktop && window.desktop.reportDirtyState) {
+      window.desktop.reportDirtyState(true);
+    }
+    updateDocumentMeta();
+    if (state.settings.autoSave && state.currentPath) scheduleAutoSave();
     return;
   }
   const source = `${getSource()}\n${text}\n`;
-  editor.dispose();
+  if (editor) editor.dispose();
   editor = createInPlaceEditor();
   editor.setTheme(state.currentTheme);
+  if (typeof editor.setDocumentPath === 'function') {
+    editor.setDocumentPath(state.currentPath);
+  }
   await editor.load(source);
   state.dirty = true;
+  updateDocumentMeta();
 }
 
-// 查找：在渲染结果中高亮匹配文本
+// 查找：基于 CodeMirror SearchCursor 或源码 textarea 原生范围匹配，绝不篡改编辑 DOM
 function runSearch() {
   const query = elements.searchInput.value.trim();
-  for (const mark of document.querySelectorAll('#document mark[data-search]')) {
-    mark.replaceWith(document.createTextNode(mark.textContent));
-  }
-  elements.docRoot.normalize();
   state.searchMatches = [];
   state.searchIndex = -1;
   if (!query) {
@@ -552,43 +585,63 @@ function runSearch() {
     return;
   }
 
-  const walker = document.createTreeWalker(elements.docRoot, NodeFilter.SHOW_TEXT);
-  const targets = [];
-  while (walker.nextNode()) targets.push(walker.currentNode);
-  for (const node of targets) {
-    const text = node.nodeValue;
+  if (state.sourceMode) {
+    const textarea = elements.docRoot.querySelector('#source-editor');
+    if (!textarea) return;
+    const text = textarea.value;
     const lower = text.toLowerCase();
     const needle = query.toLowerCase();
-    let index = lower.indexOf(needle);
-    if (index === -1) continue;
-    const fragment = document.createDocumentFragment();
-    let cursor = 0;
-    while (index !== -1) {
-      fragment.append(document.createTextNode(text.slice(cursor, index)));
-      const mark = document.createElement('mark');
-      mark.dataset.search = 'true';
-      mark.textContent = text.slice(index, index + query.length);
-      fragment.append(mark);
-      state.searchMatches.push(mark);
-      cursor = index + query.length;
-      index = lower.indexOf(needle, cursor);
+    let idx = lower.indexOf(needle);
+    while (idx !== -1) {
+      state.searchMatches.push({ from: idx, to: idx + needle.length });
+      idx = lower.indexOf(needle, idx + needle.length);
     }
-    fragment.append(document.createTextNode(text.slice(cursor)));
-    node.replaceWith(fragment);
+    elements.searchResult.textContent = state.searchMatches.length
+      ? `0/${state.searchMatches.length}`
+      : '无结果';
+    if (state.searchMatches.length > 0) focusNextMatch();
+    return;
   }
 
-  elements.searchResult.textContent = state.searchMatches.length
-    ? `0/${state.searchMatches.length}`
-    : '无结果';
-  if (state.searchMatches.length > 0) focusNextMatch();
+  if (editor && editor.blockEditor) {
+    const view = editor.blockEditor;
+    const cursor = new SearchCursor(view.state.doc, query);
+    while (!cursor.next().done) {
+      state.searchMatches.push({ from: cursor.value.from, to: cursor.value.to });
+    }
+    elements.searchResult.textContent = state.searchMatches.length
+      ? `0/${state.searchMatches.length}`
+      : '无结果';
+    if (state.searchMatches.length > 0) focusNextMatch();
+    return;
+  }
+
+  elements.searchResult.textContent = '无结果';
 }
 
 function focusNextMatch() {
   if (state.searchMatches.length === 0) return;
   state.searchIndex = (state.searchIndex + 1) % state.searchMatches.length;
-  const mark = state.searchMatches[state.searchIndex];
-  mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const match = state.searchMatches[state.searchIndex];
   elements.searchResult.textContent = `${state.searchIndex + 1}/${state.searchMatches.length}`;
+
+  if (state.sourceMode) {
+    const textarea = elements.docRoot.querySelector('#source-editor');
+    if (textarea) {
+      textarea.focus();
+      textarea.setSelectionRange(match.from, match.to);
+    }
+    return;
+  }
+
+  if (editor && editor.blockEditor) {
+    const view = editor.blockEditor;
+    view.dispatch({
+      selection: { anchor: match.from, head: match.to },
+      scrollIntoView: true
+    });
+    view.focus();
+  }
 }
 
 function hidePopovers() {
@@ -732,11 +785,17 @@ async function bootstrap() {
     await loadSettings();
     document.documentElement.style.setProperty('--editor-font-size', `${state.settings.fontSize || 16}px`);
     editor = createInPlaceEditor();
+    bindImageContextMenu({
+      container: elements.docRoot,
+      getEditor: () => editor,
+      getSettings: () => state.settings,
+      onStatus: setStatus,
+      onOpenSettings: () => elements.buttons.settings.click()
+    });
     editor.setTheme(state.currentTheme);
     await editor.load(WELCOME_DOC);
     bindEvents();
     updateDocumentMeta();
-    setStatus('就地渲染已就绪，点击任意段落即可编辑', 'ok');
   } catch (error) {
     setStatus(`初始化失败：${error.message}`, 'error');
   }

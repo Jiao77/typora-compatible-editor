@@ -1,6 +1,5 @@
 import path from 'node:path';
 import { readFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import postcss from 'postcss';
@@ -8,6 +7,7 @@ import valueParser from 'postcss-value-parser';
 
 import { MATHJAX_CONFIG } from '../shared/mathjax-config.js';
 import { runProcess } from './run-process.js';
+import { getRuntimeDataDir } from './runtime-data.js';
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const MATHJAX_BUNDLE = path.join(ROOT_DIR, 'node_modules/mathjax/tex-svg.js');
@@ -141,7 +141,9 @@ ${moduleSource}
 
 // 用 Chrome 无头模式加载导出页面，等待公式与图表渲染完成后取回固化 DOM
 export async function renderExportDom({ html, chromePath, timeoutMs = 60_000 }) {
-  const temporaryDirectory = await mkdtemp(path.join(tmpdir(), 'typora-render-'));
+  const runtimeTmpDir = path.join(getRuntimeDataDir(ROOT_DIR), 'tmp');
+  await mkdir(runtimeTmpDir, { recursive: true });
+  const temporaryDirectory = await mkdtemp(path.join(runtimeTmpDir, 'typora-render-'));
   const sourcePath = path.join(temporaryDirectory, 'document.html');
   const profileDirectory = path.join(temporaryDirectory, 'chrome-profile');
   try {

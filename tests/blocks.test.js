@@ -127,3 +127,28 @@ test('块源码替换支持拆分为多个段落', () => {
   assert.equal(paragraphs[0].source, '前半');
   assert.equal(paragraphs[1].source, '后半');
 });
+
+test('TOC 标记被正确识别为 toc 类型且空行作为独立块返回', () => {
+  const source = '[TOC]\n\n\n# 标题';
+  const { blocks, lineCount } = parseBlocks(source);
+  assert.equal(lineCount, 4);
+  const toc = blocks.find((b) => b.type === 'toc');
+  assert.ok(toc, '应当包含 toc 类型的块');
+  assert.equal(toc.startLine, 0);
+  assert.equal(toc.endLine, 1);
+
+  const emptyBlocks = blocks.filter((b) => b.type === 'empty');
+  assert.equal(emptyBlocks.length, 2, '应当识别出2个空行块');
+  assert.equal(emptyBlocks[0].startLine, 1);
+  assert.equal(emptyBlocks[0].endLine, 2);
+  assert.equal(emptyBlocks[1].startLine, 2);
+  assert.equal(emptyBlocks[1].endLine, 3);
+});
+
+test('空字符串解析能够正常返回空行块而不崩溃', () => {
+  const { blocks, lineCount } = parseBlocks('');
+  assert.equal(lineCount, 1);
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].type, 'empty');
+  assert.equal(blocks[0].source, '');
+});
