@@ -36,7 +36,7 @@ function renderFence(tokens, idx, options) {
   const classes = ['md-fences', 'mock-cm', 'md-end-block'];
   if (/\{?lineno/.test(info)) classes.push('md-fences-with-lineno');
   return `<pre class="${classes.join(' ')}" lang="${escapeHtml(lang)}">` +
-    `<code class="md-fence-code">${highlighted}</code></pre>\n`;
+    `<code class="md-fence-code hljs">${highlighted}</code></pre>\n`;
 }
 
 // 表格：外层包裹 figure.md-table-fig，单元格内容包裹 span.td-span

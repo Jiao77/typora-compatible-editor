@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('desktop', {
   // 系统集成
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   showItemInFolder: (target) => ipcRenderer.invoke('shell:showItem', target),
+  openThemeFolder: () => ipcRenderer.invoke('shell:openThemeFolder'),
 
   // 窗口关闭前保存确认
   confirmClose: (hasUnsaved) => ipcRenderer.invoke('window:confirmClose', hasUnsaved),

@@ -4,6 +4,8 @@ const elements = {
   nav: document.querySelectorAll('.nav-item'),
   sections: document.querySelectorAll('.settings-section'),
   theme: document.querySelector('#set-theme'),
+  openThemeFolder: document.querySelector('#open-theme-folder'),
+  themeFolderStatus: document.querySelector('#theme-folder-status'),
   darkTheme: document.querySelector('#set-dark-theme'),
   followSystem: document.querySelector('#set-follow-system'),
   fontSize: document.querySelector('#set-font-size'),
@@ -280,6 +282,25 @@ async function bootstrap() {
   } catch (error) {
     setStatus(`初始化失败：${error.message}`, 'error');
   }
+}
+
+
+if (window.desktop && typeof window.desktop.openThemeFolder === 'function') {
+  elements.openThemeFolder.addEventListener('click', async () => {
+    elements.themeFolderStatus.className = 'status-note';
+    elements.themeFolderStatus.textContent = '正在打开…';
+    try {
+      await window.desktop.openThemeFolder();
+      elements.themeFolderStatus.className = 'status-note is-ok';
+      elements.themeFolderStatus.textContent = '已打开主题文件夹';
+    } catch (error) {
+      elements.themeFolderStatus.className = 'status-note is-error';
+      elements.themeFolderStatus.textContent = `打开失败：${error.message}`;
+    }
+  });
+} else {
+  elements.openThemeFolder.hidden = true;
+  elements.themeFolderStatus.textContent = '仅桌面版可用';
 }
 
 bootstrap();
