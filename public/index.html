@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- 本地应用：允许 blob worker（Mermaid 渲染需要）与 data/blob 资源 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: file:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file: https: http:; font-src 'self' data: file:; worker-src 'self' blob:; connect-src 'self' data: blob:;">
-<title>Typora 兼容编辑器</title>
+<title>TYPOAR</title>
+<link rel="icon" type="image/png" href="/branding/typo-ar.png">
 <link rel="stylesheet" href="/style/app.css">
 </head>
 <body data-theme="github">
@@ -63,7 +64,7 @@
 <!-- 底部状态栏：字数、主题、图床与导出入口 -->
 <footer class="statusbar">
   <div class="status-left">
-    <span id="status" class="status-text" data-kind="info">正在初始化…</span>
+    <span id="status" class="status-text" data-kind="info"></span>
   </div>
   <div class="status-right">
     <span id="word-count" class="status-meta">0 字</span>

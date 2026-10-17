@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { existsSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -338,24 +339,47 @@ async function renderCssFile(filePath, { themeId, themeRoot, seen }) {
 }
 
 export class ThemeRegistry {
-  constructor({ userThemeDir, builtinThemeDir }) {
-    if (typeof userThemeDir !== 'string' || typeof builtinThemeDir !== 'string') {
-      throw new TypeError('userThemeDir 与 builtinThemeDir 必须是目录路径字符串');
+  constructor({ userThemeDir, builtinThemeDir, bundledThemeDir } = {}) {
+    if (userThemeDir !== undefined && typeof userThemeDir !== 'string') {
+      throw new TypeError('userThemeDir 必须是目录路径字符串');
+    }
+    if (builtinThemeDir !== undefined && typeof builtinThemeDir !== 'string') {
+      throw new TypeError('builtinThemeDir 必须是目录路径字符串');
+    }
+    if (bundledThemeDir !== undefined && typeof bundledThemeDir !== 'string') {
+      throw new TypeError('bundledThemeDir 必须是目录路径字符串');
     }
 
-    this.userThemeDir = path.resolve(userThemeDir);
-    this.builtinThemeDir = path.resolve(builtinThemeDir);
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    this.userThemeDir = userThemeDir ? path.resolve(userThemeDir) : null;
+    this.builtinThemeDir = builtinThemeDir ? path.resolve(builtinThemeDir) : null;
+    this.bundledThemeDir = bundledThemeDir
+      ? path.resolve(bundledThemeDir)
+      : path.resolve(__dirname, '../../resources/themes');
   }
 
   list() {
     const themes = new Map();
 
-    for (const theme of this.#themeEntries(this.builtinThemeDir)) {
-      themes.set(theme.id, { ...theme, source: 'builtin' });
+    // 1. 项目自带捆绑基础主题
+    if (this.bundledThemeDir && existsSync(this.bundledThemeDir)) {
+      for (const theme of this.#themeEntries(this.bundledThemeDir)) {
+        themes.set(theme.id, { ...theme, source: 'builtin' });
+      }
     }
 
-    for (const theme of this.#themeEntries(this.userThemeDir)) {
-      themes.set(theme.id, { ...theme, source: 'user' });
+    // 2. 外部 Typora 内置主题（若存在）
+    if (this.builtinThemeDir && this.builtinThemeDir !== this.bundledThemeDir && existsSync(this.builtinThemeDir)) {
+      for (const theme of this.#themeEntries(this.builtinThemeDir)) {
+        themes.set(theme.id, { ...theme, source: 'builtin' });
+      }
+    }
+
+    // 3. 用户主题（最高优先级，覆盖同名内置/捆绑主题）
+    if (this.userThemeDir && existsSync(this.userThemeDir)) {
+      for (const theme of this.#themeEntries(this.userThemeDir)) {
+        themes.set(theme.id, { ...theme, source: 'user' });
+      }
     }
 
     const overlays = this.#userOverlayEntries();
@@ -446,6 +470,10 @@ export class ThemeRegistry {
   }
 
   #themeEntries(directory) {
+    if (!directory || !existsSync(directory)) {
+      return [];
+    }
+
     return cssFilesInDirectory(directory)
       .filter((fileName) => !fileName.toLowerCase().endsWith('.user.css'))
       .map((fileName) => ({
@@ -457,6 +485,9 @@ export class ThemeRegistry {
 
   #userOverlayEntries() {
     const overlays = new Map();
+    if (!this.userThemeDir || !existsSync(this.userThemeDir)) {
+      return overlays;
+    }
 
     for (const fileName of cssFilesInDirectory(this.userThemeDir)) {
       if (!fileName.toLowerCase().endsWith('.user.css')) {
@@ -480,10 +511,18 @@ export class ThemeRegistry {
       return null;
     }
 
-    for (const [directory, source] of [
-      [this.userThemeDir, 'user'],
-      [this.builtinThemeDir, 'builtin'],
-    ]) {
+    const candidateDirs = [];
+    if (this.userThemeDir && existsSync(this.userThemeDir)) {
+      candidateDirs.push([this.userThemeDir, 'user']);
+    }
+    if (this.builtinThemeDir && this.builtinThemeDir !== this.bundledThemeDir && existsSync(this.builtinThemeDir)) {
+      candidateDirs.push([this.builtinThemeDir, 'builtin']);
+    }
+    if (this.bundledThemeDir && existsSync(this.bundledThemeDir)) {
+      candidateDirs.push([this.bundledThemeDir, 'builtin']);
+    }
+
+    for (const [directory, source] of candidateDirs) {
       const themeEntry = this.#themeEntries(directory).find(
         (entry) => themeIdCandidatesList.includes(entry.id),
       );

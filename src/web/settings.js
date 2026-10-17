@@ -21,6 +21,10 @@ const elements = {
   picgoEndpoint: document.querySelector('#set-picgo-endpoint'),
   targetDir: document.querySelector('#set-target-dir'),
   customUrl: document.querySelector('#set-custom-url'),
+  customToken: document.querySelector('#set-custom-token'),
+  customBodyType: document.querySelector('#set-custom-body-type'),
+  customFileField: document.querySelector('#set-custom-file-field'),
+  customUrlPath: document.querySelector('#set-custom-url-path'),
   checkPicgo: document.querySelector('#check-picgo'),
   picgoStatus: document.querySelector('#picgo-status'),
   pageSize: document.querySelector('#set-page-size'),
@@ -139,13 +143,26 @@ function applySettings(settings) {
   elements.picgoEndpoint.value = settings.endpoint || '';
   elements.targetDir.value = settings.targetDir || '';
   elements.customUrl.value = settings.url || '';
+  if (elements.customToken) {
+    elements.customToken.value = settings.token ? '••••••••' : '';
+    elements.customToken.dataset.hasSavedToken = settings.token ? 'true' : 'false';
+  }
+  if (elements.customBodyType) {
+    elements.customBodyType.value = settings.bodyType || 'multipart';
+  }
+  if (elements.customFileField) {
+    elements.customFileField.value = settings.fileField || 'file';
+  }
+  if (elements.customUrlPath) {
+    elements.customUrlPath.value = settings.urlPath || 'url';
+  }
   elements.pageSize.value = settings.pageSize || 'A4';
   elements.margin.value = String(settings.margin || 16);
   elements.marginValue.textContent = `${elements.margin.value} 毫米`;
 }
 
 function collectSettings() {
-  return {
+  const payload = {
     theme: elements.theme.value,
     darkTheme: elements.darkTheme.value,
     followSystem: elements.followSystem.checked,
@@ -163,8 +180,25 @@ function collectSettings() {
     targetDir: elements.targetDir.value.trim(),
     url: elements.customUrl.value.trim(),
     pageSize: elements.pageSize.value,
-    margin: Number(elements.margin.value)
+    margin: Number(elements.margin.value),
   };
+
+  if (elements.customBodyType) {
+    payload.bodyType = elements.customBodyType.value;
+  }
+  if (elements.customFileField) {
+    payload.fileField = elements.customFileField.value.trim() || 'file';
+  }
+  if (elements.customUrlPath) {
+    payload.urlPath = elements.customUrlPath.value.trim() || 'url';
+  }
+  if (elements.customToken) {
+    const tokenVal = elements.customToken.value.trim();
+    if (tokenVal !== '' && tokenVal !== '••••••••') {
+      payload.token = tokenVal;
+    }
+  }
+  return payload;
 }
 
 async function loadEnvironment() {

@@ -6,14 +6,17 @@ import { fileURLToPath } from 'node:url';
 import { readFile, writeFile, mkdir, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 
+import { getRuntimeDataDir } from './runtime-data.js';
 import { ThemeRegistry } from './theme.js';
 import { ImageHost, UPLOADERS, checkPicGoService, DEFAULT_PICGO_ENDPOINT } from './imagehost.js';
 import { renderMarkdown, renderDocument } from './render.js';
+import { createDocumentAssetsRouter } from './document-assets.js';
 import { parseBlocks } from './blocks.js';
 import { exportPdf, exportStandaloneHtml, exportViaPandoc, findChrome, findPandoc } from './export.js';
 import {
   DEFAULT_USER_THEME_DIR,
   DEFAULT_BUILTIN_THEME_DIR,
+  DEFAULT_BUNDLED_THEME_DIR,
   loadSettings,
   saveSettings,
   resetSettings
@@ -22,6 +25,7 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '../..');
 const PUBLIC_DIR = path.join(ROOT_DIR, 'public');
+const BRANDING_DIR = path.join(ROOT_DIR, 'resources/branding');
 const FORMAT_HOME = path.join(os.homedir(), 'Library/Application Support/abnerworks.Typora');
 
 const app = express();
@@ -29,7 +33,8 @@ const port = Number(process.env.PORT || 7788);
 
 const userThemeDir = process.env.TYPORA_THEME_DIR || path.join(FORMAT_HOME, 'themes');
 const builtinThemeDir = process.env.TYPORA_BUILTIN_THEME_DIR || DEFAULT_BUILTIN_THEME_DIR;
-const themes = new ThemeRegistry({ userThemeDir, builtinThemeDir });
+const bundledThemeDir = DEFAULT_BUNDLED_THEME_DIR;
+const themes = new ThemeRegistry({ userThemeDir, builtinThemeDir, bundledThemeDir });
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 64 * 1024 * 1024 } });
 
@@ -105,7 +110,7 @@ app.post('/api/preview', async (req, res, next) => {
   try {
     const source = String(req.body.source ?? '');
     const themeId = req.body.theme || 'github';
-    const title = req.body.title || 'Typora 兼容编辑器';
+    const title = req.body.title || 'TYPOAR';
     const css = await themes.getCss(themeId);
     const html = renderDocument({ source, css, title });
     res.type('html').send(html);
@@ -125,7 +130,7 @@ app.post('/api/export/html', async (req, res, next) => {
     const { body } = renderMarkdown(source);
     await exportStandaloneHtml({
       bodyHtml: body,
-      title: req.body.title || '',
+      title: req.body.title || 'TYPOAR',
       css,
       outPath,
       themeId,
@@ -149,7 +154,7 @@ app.post('/api/export/pdf', async (req, res, next) => {
     await mkdir(path.dirname(outPath), { recursive: true });
     await exportPdf({
       bodyHtml: body,
-      title: req.body.title || '',
+      title: req.body.title || 'TYPOAR',
       css,
       outPath,
       options: {
@@ -241,20 +246,38 @@ app.get('/api/images/status', async (req, res, next) => {
 app.post('/api/images/upload', upload.array('files'), async (req, res, next) => {
   try {
     const settings = await loadSettings(ROOT_DIR);
-    const documentDir = path.resolve(String(req.body.documentDir || process.cwd()));
-    const staging = path.join(ROOT_DIR, 'work', 'uploads');
+    let documentDir = process.cwd();
+    const rawDocDir = String(req.body.documentDir || '');
+    if (rawDocDir.trim()) {
+      const resolvedDocPath = path.resolve(rawDocDir.trim());
+      try {
+        const s = await stat(resolvedDocPath);
+        documentDir = s.isFile() ? path.dirname(resolvedDocPath) : resolvedDocPath;
+      } catch {
+        documentDir = path.extname(resolvedDocPath) ? path.dirname(resolvedDocPath) : resolvedDocPath;
+      }
+    } else {
+      documentDir = path.join(getRuntimeDataDir(ROOT_DIR), 'uploads');
+    }
+    const staging = path.join(getRuntimeDataDir(ROOT_DIR), 'uploads');
     await mkdir(staging, { recursive: true });
 
     const files = [];
     for (const file of req.files || []) {
-      const target = path.join(staging, `${Date.now()}-${file.originalname}`);
+      const originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
+      const target = path.join(staging, `${Date.now()}-${originalname}`);
       await writeFile(target, file.buffer);
-      files.push({ path: target, filename: file.originalname, mime: file.mimetype });
+      files.push({ path: target, filename: originalname, mime: file.mimetype });
     }
+
+    const effectiveSettings = {
+      ...settings,
+      targetDir: (typeof settings.targetDir === 'string' && settings.targetDir.trim() !== '') ? settings.targetDir.trim() : 'uploads'
+    };
 
     const host = new ImageHost({
       uploader: req.body.uploader || settings.image_uploader,
-      settings,
+      settings: effectiveSettings,
       documentDir
     });
     const results = await host.upload(files);
@@ -306,9 +329,17 @@ app.get('/api/environment', async (req, res, next) => {
   }
 });
 
+// ---------- 本地与文档媒体资源 ----------
+
+app.use(createDocumentAssetsRouter({ rootDir: ROOT_DIR }));
+
 // ---------- 静态资源 ----------
 
 app.use(express.static(PUBLIC_DIR));
+app.use('/branding', express.static(BRANDING_DIR));
+app.get('/favicon.ico', (req, res) => {
+  res.sendFile(path.join(BRANDING_DIR, 'typo-ar.png'));
+});
 // 前端构建产物
 app.use('/dist', express.static(path.join(ROOT_DIR, 'dist')));
 // MathJax 与 Mermaid 由 Node 依赖直接提供，导出与预览共用同一份文件
@@ -322,7 +353,7 @@ app.get('/', (req, res) => {
 });
 
 function defaultOutputPath(ext) {
-  return path.join(ROOT_DIR, 'work', 'exports', `export-${Date.now()}.${ext}`);
+  return path.join(getRuntimeDataDir(ROOT_DIR), 'exports', `export-${Date.now()}.${ext}`);
 }
 
 // 统一错误处理，完整反馈真实原因
@@ -358,7 +389,7 @@ export function startServer({ port: requestedPort = port, host = '127.0.0.1' } =
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   startServer({ port }).then((info) => {
-    console.log(`Typora 兼容编辑器已启动：${info.url}`);
+    console.log(`TYPOAR 已启动：${info.url}`);
     console.log(`用户主题目录：${userThemeDir}`);
     console.log(`内置主题目录：${builtinThemeDir}`);
   });

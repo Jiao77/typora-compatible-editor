@@ -7,8 +7,8 @@ import { fileURLToPath } from 'node:url';
 import { ThemeRegistry } from '../src/server/theme.js';
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const userThemeDir = '/Users/jiao77-mac/Library/Application Support/abnerworks.Typora/themes';
-const builtinThemeDir = '/Applications/Typora.app/Contents/Resources/TypeMark/style/themes';
+const userThemeDir = path.join(projectRoot, 'tests', 'fixtures', 'themes', 'user');
+const builtinThemeDir = path.join(projectRoot, 'tests', 'fixtures', 'themes', 'builtin');
 const registry = new ThemeRegistry({ userThemeDir, builtinThemeDir });
 
 test('列出用户主题与内置主题', () => {
@@ -38,7 +38,7 @@ test('github 主题改写字体资源路径并保留自定义 at-rule', async ()
 
   assert.ok(
     css.includes(
-      '/theme-assets/github/github/open-sans-v17-latin-ext_latin-regular.woff2',
+      '/theme-assets/github/github/open-sans-latin-400-normal.woff2',
     ),
   );
   assert.ok(css.includes('@include-when-export'));
@@ -57,15 +57,27 @@ test('night 主题内联 mermaid 导入且不再包含 @import', async () => {
 test('resolveAsset 返回主题目录内存在的绝对文件路径', () => {
   const assetPath = registry.resolveAsset(
     'github',
-    './github/open-sans-v17-latin-ext_latin-regular.woff2',
+    './github/open-sans-latin-400-normal.woff2',
   );
 
   assert.ok(path.isAbsolute(assetPath));
   assert.ok(existsSync(assetPath));
   assert.equal(path.dirname(path.dirname(assetPath)), userThemeDir);
-  assert.equal(path.basename(projectRoot), 'outputs');
 });
 
 test('resolveAsset 拒绝目录穿越路径', () => {
   assert.equal(registry.resolveAsset('github', '../../../../etc/passwd'), null);
+});
+
+test('构造函数输入非字符串路径时抛出 TypeError', () => {
+  assert.throws(() => new ThemeRegistry({ userThemeDir: 12345 }), TypeError);
+  assert.throws(() => new ThemeRegistry({ builtinThemeDir: true }), TypeError);
+  assert.throws(() => new ThemeRegistry({ bundledThemeDir: {} }), TypeError);
+});
+
+test('请求不存在的主题时 getCss 显式报错', async () => {
+  await assert.rejects(
+    async () => registry.getCss('nonexistent-theme-xyz'),
+    /未知主题：nonexistent-theme-xyz/,
+  );
 });

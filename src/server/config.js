@@ -1,16 +1,22 @@
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { getRuntimeDataDir } from './runtime-data.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+export const ROOT_DIR = path.resolve(__dirname, '../..');
 
 // Typora 本机真实目录，作为默认值
 export const TYPORA_HOME = path.join(os.homedir(), 'Library/Application Support/abnerworks.Typora');
 export const DEFAULT_USER_THEME_DIR = path.join(TYPORA_HOME, 'themes');
 export const DEFAULT_BUILTIN_THEME_DIR =
   '/Applications/Typora.app/Contents/Resources/TypeMark/style/themes';
+export const DEFAULT_BUNDLED_THEME_DIR = path.join(ROOT_DIR, 'resources', 'themes');
 
 export const DEFAULT_SETTINGS = {
   theme: 'Github',
-  darkTheme: 'Latex',
+  darkTheme: 'Night',
   image_uploader: 'ipic',
   enable_inline_math: true,
   strict_mode: true,
@@ -28,12 +34,16 @@ export const DEFAULT_SETTINGS = {
   margin: 16,
   endpoint: '',
   targetDir: '',
-  url: ''
+  url: '',
+  token: '',
+  bodyType: 'json',
+  fileField: 'file',
+  urlPath: 'url'
 };
 
-// 设置文件写入工程自身目录，避免污染 Typora 用户配置
-export function settingsPath(rootDir) {
-  return path.join(rootDir, 'work', 'settings.json');
+// 设置文件写入运行时数据目录，避免污染 Typora 用户配置
+export function settingsPath(rootDir = ROOT_DIR) {
+  return path.join(getRuntimeDataDir(rootDir), 'settings.json');
 }
 
 export async function loadSettings(rootDir) {
