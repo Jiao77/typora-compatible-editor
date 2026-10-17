@@ -174,6 +174,18 @@ function openSettingsWindow() {
   return settingsWindow;
 }
 
+async function openThemeFolder() {
+  const dir = process.env.TYPORA_THEME_DIR
+    ? path.resolve(process.env.TYPORA_THEME_DIR)
+    : path.join(app.getPath('home'), 'Library/Application Support/abnerworks.Typora/themes');
+  mkdirSync(dir, { recursive: true });
+  const error = await shell.openPath(dir);
+  if (error) {
+    throw new Error(error);
+  }
+  return dir;
+}
+
 // 构建原生菜单，快捷键与 Typora 保持一致
 function buildMenu() {
   if (app.setAboutPanelOptions) {
@@ -285,7 +297,11 @@ function buildMenu() {
         { type: 'separator' },
         {
           label: '打开主题文件夹',
-          click: () => shell.openPath(path.join(app.getPath('home'), 'Library/Application Support/abnerworks.Typora/themes'))
+          click: () => {
+            openThemeFolder().catch((error) => {
+              dialog.showErrorBox('打开主题文件夹失败', error.message);
+            });
+          }
         }
       ]
     },
@@ -393,6 +409,7 @@ function registerIpc() {
 
   ipcMain.handle('shell:openExternal', (event, url) => shell.openExternal(url));
   ipcMain.handle('shell:showItem', (event, target) => shell.showItemInFolder(target));
+  ipcMain.handle('shell:openThemeFolder', () => openThemeFolder());
 }
 
 app.whenReady().then(async () => {

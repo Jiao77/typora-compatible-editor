@@ -28,16 +28,17 @@ export function createEditorExtensions({ onDocChange, onSelectionChange, onEscap
         const text = line.text;
         const relativeStart = from - line.from;
 
-        const taskMatch = /^\s*([-*+])\s+\[[ xX]\]\s*/.exec(text);
-        const orderedMatch = /^\s*(\d+)\.\s+/.exec(text);
-        const unorderedMatch = /^\s*([-*+])\s+/.exec(text);
+        const taskMatch = /^(\s*)([-*+])\s+\[[ xX]\]\s*/.exec(text);
+        const orderedMatch = /^(\s*)(\d+)\.\s+/.exec(text);
+        const unorderedMatch = /^(\s*)([-*+])\s+/.exec(text);
         const marker = taskMatch || orderedMatch || unorderedMatch;
 
         // 如果光标在空列表标记处按回车，清除该标记并退出列表
         if (marker && text.trim() === marker[0].trim() && relativeStart <= marker[0].length) {
           view.dispatch({
             changes: { from: line.from, to: line.to, insert: '' },
-            selection: { anchor: line.from }
+            selection: { anchor: line.from },
+            scrollIntoView: true
           });
           return true;
         }
@@ -46,15 +47,16 @@ export function createEditorExtensions({ onDocChange, onSelectionChange, onEscap
         if (marker && relativeStart >= marker[0].length) {
           let prefix = '';
           if (taskMatch) {
-            prefix = taskMatch[1] + ' [ ] ';
+            prefix = taskMatch[1] + taskMatch[2] + ' [ ] ';
           } else if (orderedMatch) {
-            prefix = (Number(orderedMatch[1]) + 1) + '. ';
+            prefix = orderedMatch[1] + (Number(orderedMatch[2]) + 1) + '. ';
           } else if (unorderedMatch) {
-            prefix = unorderedMatch[1] + ' ';
+            prefix = unorderedMatch[1] + unorderedMatch[2] + ' ';
           }
           view.dispatch({
             changes: { from, to, insert: '\n' + prefix },
-            selection: { anchor: from + 1 + prefix.length }
+            selection: { anchor: from + 1 + prefix.length },
+            scrollIntoView: true
           });
           return true;
         }
@@ -62,7 +64,8 @@ export function createEditorExtensions({ onDocChange, onSelectionChange, onEscap
         // 普通行：标准换行，插入单换行符
         view.dispatch({
           changes: { from, to, insert: '\n' },
-          selection: { anchor: from + 1 }
+          selection: { anchor: from + 1 },
+          scrollIntoView: true
         });
         return true;
       }
@@ -73,7 +76,8 @@ export function createEditorExtensions({ onDocChange, onSelectionChange, onEscap
         const { from, to } = view.state.selection.main;
         view.dispatch({
           changes: { from, to, insert: '\n' },
-          selection: { anchor: from + 1 }
+          selection: { anchor: from + 1 },
+          scrollIntoView: true
         });
         return true;
       }

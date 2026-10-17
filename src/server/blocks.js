@@ -69,6 +69,8 @@ function detectType(group) {
       return 'toc';
     case 'paragraph_open':
       return 'paragraph';
+    case 'dl_open':
+      return 'deflist';
     default:
       return 'block';
   }
@@ -78,8 +80,42 @@ export function parseBlocks(source, env = {}) {
   const text = String(source ?? '');
   // env 必须在 parse 与 render 之间共享，脚注等插件依赖它
   const tokens = markdownIt.parse(text, env);
+  const footnoteBlockIndex = tokens.findIndex((t) => t.type === 'footnote_block_open');
+  const bodyTokens = footnoteBlockIndex >= 0 ? tokens.slice(0, footnoteBlockIndex) : tokens;
+  const footnotesHtml = footnoteBlockIndex >= 0
+    ? markdownIt.renderer.render(tokens.slice(footnoteBlockIndex), markdownIt.options, env)
+    : '';
   const lines = text.split('\n');
-  const parsedGroups = groupTopLevel(tokens);
+  const parsedGroups = groupTopLevel(bodyTokens);
+
+  if (footnoteBlockIndex >= 0) {
+    const footnoteCloseIndex = tokens.findIndex((t) => t.type === 'footnote_block_close');
+    let currentFootnote = null;
+    let footnoteIndex = 0;
+    for (let i = footnoteBlockIndex + 1; i < footnoteCloseIndex; i++) {
+      const token = tokens[i];
+      if (token.type === 'footnote_open') {
+        currentFootnote = {
+          tokens: [],
+          start: null,
+          end: null,
+          footnoteIndex: footnoteIndex++
+        };
+      } else if (token.type === 'footnote_close') {
+        if (currentFootnote && currentFootnote.start !== null && currentFootnote.end !== null) {
+          parsedGroups.push(currentFootnote);
+        }
+        currentFootnote = null;
+      } else if (currentFootnote) {
+        currentFootnote.tokens.push(token);
+        if (token.map) {
+          if (currentFootnote.start === null) currentFootnote.start = token.map[0];
+          currentFootnote.end = Math.max(currentFootnote.end ?? 0, token.map[1]);
+        }
+      }
+    }
+  }
+
   parsedGroups.sort((a, b) => a.start - b.start);
 
   const mergedGroups = [];
@@ -140,9 +176,13 @@ export function parseBlocks(source, env = {}) {
         html = '<div class="md-definition md-end-block" style="display:none"></div>';
       }
     } else {
-      type = detectType(group.tokens);
+      type = group.footnoteIndex !== undefined ? 'footnote' : detectType(group.tokens);
       html = markdownIt.renderer.render(group.tokens, markdownIt.options, env);
     }
+
+    const footnoteRefs = (group.tokens || [])
+      .filter((t) => t.type === 'inline' && Array.isArray(t.children))
+      .flatMap((t) => t.children.filter((c) => c.type === 'footnote_ref' && c.meta).map((c) => ({ ...c.meta })));
 
     return {
       index,
@@ -151,11 +191,13 @@ export function parseBlocks(source, env = {}) {
       source: sourceText,
       html,
       type,
-      taskLines: taskLines.length > 0 ? taskLines : undefined
+      taskLines: taskLines.length > 0 ? taskLines : undefined,
+      footnoteRefs: footnoteRefs.length > 0 ? footnoteRefs : undefined,
+      footnoteIndex: group.footnoteIndex
     };
   });
 
-  return { blocks, lineCount: lines.length };
+  return { blocks, lineCount: lines.length, footnotesHtml };
 }
 
 export default parseBlocks;
